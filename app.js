@@ -1,5 +1,33 @@
 const express = require('express');
 const path = require('path');
+const OAuth2Server = require('oauth2-server');
+
+const authenticateRequest = (req, res, next) => {
+    let request = new OAuth2Server.Request(req);
+    let response = new OAuth2Server.Response(res);
+  
+    return oauth.authenticate(request, response)
+        .then(()=>{
+            next();
+        })
+        .catch((err) => {
+            res.send('You are not allowed');
+        })
+}
+
+const obtainToken = (req, res) => {
+    let request = new OAuth2Server.Request(req);
+    let response = new OAuth2Server.Response(res);
+  
+    return oauth.token(request, response)
+        .then((token) => {
+            res.json(token);
+        })
+        .catch((err) => {
+            res.status(err.code || 500).json(err);
+            // res.json(err);
+        })
+}
 
 const app = express();
 
@@ -8,6 +36,12 @@ app.use(express.urlencoded({extended: true}));
 
 const PORT = 4001;
 
+const oauth = new OAuth2Server({
+    model: require('./model.js'),
+    allowBearerTokensInQueryString: true,
+    accessTokenLifetime: 60 * 60
+});
+
 app.get('/', (req, res)=>{
     res.sendFile(path.join(__dirname, 'public/home.html'));
 })
@@ -15,9 +49,11 @@ app.get('/login', (req, res)=>{
     res.sendFile(path.join(__dirname, 'public/login.html'));
 })
 
-app.get('/secret', (req, res)=>{
-    res.send('Welcome to the secret area.');
-})
+app.get('/secret', authenticateRequest, function(req, res) {
+    res.send("Welcome to the secret area!");
+});
+
+app.all('/auth', obtainToken);
 
 app.listen(PORT, ()=>console.log(`Listening on port ${PORT}`));
 
